@@ -5,30 +5,41 @@ const jwt = require('jsonwebtoken');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const cloudinary = require('./config/cloudinary');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 require('dotenv').config();
 const Product = require('./models/Product');
 const connectDB = require('./config/db');
 connectDB();
 
-const BASE_URL = process.env.BASE_URL || 'https://ashwini-jadhav.onrender.com';
-
-// If Render (or any reverse‑proxy) terminates SSL, Express needs to trust the proxy
-app.set('trust proxy', true);
-
-
-
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000', // local dev
+    'https://your-production-frontend-domain', // production, replace with your deployed frontend
+  ],
+  credentials: true,
+}));
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+// app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// BASE_URL fallback for local development
+const BASE_URL = process.env.BASE_URL || 'http://localhost:5000'; // Set BASE_URL in .env for production
+app.set('trust proxy', true);
 
-// Create uploads directory if it doesn't exist
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
+// Multer Cloudinary storage setup
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'products',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+    transformation: [{ width: 800, crop: 'limit', quality: 'auto' }],
+  },
+});
+const upload = multer({ storage });
 
 // In-memory storage (replacing MongoDB)
 let products = [];
@@ -167,35 +178,6 @@ const verifyToken = (req, res, next) => {
     return res.status(401).json({ message: 'Invalid token' });
   }
 };
-
-// File upload configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({ 
-  storage: storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
-    
-    if (mimetype && extname) {
-      return cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed'));
-    }
-  }
-});
-
-// Routes
-
 // Auth routes
 app.post('/api/auth/login', async (req, res) => {
   try {
@@ -239,25 +221,23 @@ app.get('/api/products', async (req, res) => {
 app.post('/api/products', verifyToken, upload.single('image'), async (req, res) => {
   try {
     const { name, description, price, affiliateLink, brand } = req.body;
-    
     let imageUrl = '';
+    let cloudinaryId = '';
     if (req.file) {
-      // ✅ Force full HTTPS URL using BASE_URL
-      imageUrl = `${BASE_URL}/uploads/${req.file.filename}`;
+      imageUrl = req.file.path; // Cloudinary HTTPS URL
+      cloudinaryId = req.file.filename; // Cloudinary public_id
     } else if (req.body.imageUrl) {
-      // Fallback if already provided (e.g., from Cloudinary or elsewhere)
       imageUrl = req.body.imageUrl;
     }
-
     const product = new Product({
       name,
       description,
       price,
       imageUrl,
+      cloudinaryId,
       affiliateLink,
       brand
     });
-
     await product.save();
     res.status(201).json(product);
   } catch (error) {
@@ -266,21 +246,19 @@ app.post('/api/products', verifyToken, upload.single('image'), async (req, res) 
   }
 });
 
-
 // Update a product
 app.put('/api/products/:id', verifyToken, upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, price, affiliateLink, brand } = req.body;
-
     let imageUrl;
+    let cloudinaryId;
     if (req.file) {
-      // ✅ Use BASE_URL instead of req.protocol
-      imageUrl = `${BASE_URL}/uploads/${req.file.filename}`;
+      imageUrl = req.file.path;
+      cloudinaryId = req.file.filename;
     } else if (req.body.imageUrl) {
       imageUrl = req.body.imageUrl;
     }
-
     const updateData = {
       name,
       description,
@@ -289,10 +267,9 @@ app.put('/api/products/:id', verifyToken, upload.single('image'), async (req, re
       brand,
     };
     if (imageUrl) updateData.imageUrl = imageUrl;
-
+    if (cloudinaryId) updateData.cloudinaryId = cloudinaryId;
     const product = await Product.findByIdAndUpdate(id, updateData, { new: true });
     if (!product) return res.status(404).json({ message: 'Product not found' });
-
     res.json(product);
   } catch (error) {
     console.error('Error updating product:', error);
@@ -300,38 +277,37 @@ app.put('/api/products/:id', verifyToken, upload.single('image'), async (req, re
   }
 });
 
-
 // Soft delete a product (set isActive to false)
 app.delete('/api/products/:id', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
-    const product = await Product.findByIdAndUpdate(id, { isActive: false }, { new: true });
+    const product = await Product.findById(id);
     if (!product) return res.status(404).json({ message: 'Product not found' });
-
-    res.json({ message: 'Product deleted successfully' });
+    if (product.cloudinaryId) {
+      await cloudinary.uploader.destroy(product.cloudinaryId);
+    }
+    await Product.findByIdAndDelete(id);
+    res.json({ message: 'Product and image deleted successfully' });
   } catch (error) {
     console.error('Error deleting product:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-
-// Image upload route
+// Image upload route (standalone)
 app.post('/api/upload', verifyToken, upload.single('image'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
-
-    // ✅ Use BASE_URL instead of protocol logic
-    const imageUrl = `${BASE_URL}/uploads/${req.file.filename}`;
-    res.json({ imageUrl });
+    const imageUrl = req.file.path; // Cloudinary HTTPS URL
+    const cloudinaryId = req.file.filename;
+    res.json({ imageUrl, cloudinaryId });
   } catch (error) {
     console.error('Error uploading image:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
-
 
 // Start server
 const startServer = async () => {
@@ -346,3 +322,7 @@ const startServer = async () => {
 };
 
 startServer();
+
+// Reminder for frontend devs:
+// In your frontend .env, set VITE_API_BASE_URL=http://localhost:5000/api for local testing
+// and VITE_API_BASE_URL=https://your-production-backend-domain/api for production

@@ -6,6 +6,7 @@ const productSchema = new mongoose.Schema({
   description: String,
   price: String,
   imageUrl: String,
+  cloudinaryId: String, 
   affiliateLink: String,
   brand: String,
   isActive: { type: Boolean, default: true },

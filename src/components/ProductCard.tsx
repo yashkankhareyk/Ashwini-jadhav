@@ -7,6 +7,7 @@ interface Product {
   description: string;
   price: string;
   imageUrl: string;
+  cloudinaryId?: string;
   affiliateLink: string;
   brand?: string;
 }
@@ -27,7 +28,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     >
       <div className="aspect-square bg-gray-50 overflow-hidden">
         <img
-          src={product.imageUrl}
+          src={product.imageUrl ? product.imageUrl.replace('/upload/', '/upload/w_400,f_auto,q_auto/') : ''}
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
         />

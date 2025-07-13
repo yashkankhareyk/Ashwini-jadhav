@@ -8,6 +8,7 @@ interface Product {
   description: string;
   price: string; // '₹1,299'
   imageUrl: string;
+  cloudinaryId?: string;
   affiliateLink: string;
   brand?: string;
 }
@@ -31,7 +32,9 @@ const ProductGrid: React.FC = () => {
   const fetchProducts = async () => {
     try {
       const response = await api.get('/products');
-      setProducts(response.data);
+      // Ensure response.data is an array
+      const productsData = Array.isArray(response.data) ? response.data : [];
+      setProducts(productsData);
       setLoading(false);
     } catch (err) {
       setError('Failed to fetch products');
@@ -41,6 +44,12 @@ const ProductGrid: React.FC = () => {
   };
 
   const handleFilterAndSort = () => {
+    // Ensure products is an array before proceeding
+    if (!Array.isArray(products)) {
+      setFilteredProducts([]);
+      return;
+    }
+
     let updatedProducts = [...products];
 
     // Filter by brand
@@ -123,21 +132,19 @@ const ProductGrid: React.FC = () => {
     }
   ];
 
-  const uniqueBrands = Array.from(new Set(products.map((p) => p.brand))).filter(Boolean);
-
-  
+  const uniqueBrands = Array.from(new Set(products?.map((p) => p.brand))).filter(Boolean);
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
         {[...Array(8)].map((_, index) => (
           <div key={index} className="bg-white rounded-lg overflow-hidden animate-pulse">
             <div className="aspect-square bg-gray-200"></div>
-            <div className="p-4">
-              <div className="h-4 bg-gray-200 rounded mb-2"></div>
-              <div className="h-6 bg-gray-200 rounded mb-2"></div>
-              <div className="h-4 bg-gray-200 rounded mb-3"></div>
-              <div className="h-6 bg-gray-200 rounded w-20"></div>
+            <div className="p-2 md:p-4">
+              <div className="h-3 md:h-4 bg-gray-200 rounded mb-2"></div>
+              <div className="h-4 md:h-6 bg-gray-200 rounded mb-2"></div>
+              <div className="h-3 md:h-4 bg-gray-200 rounded mb-3"></div>
+              <div className="h-4 md:h-6 bg-gray-200 rounded w-16 md:w-20"></div>
             </div>
           </div>
         ))}
@@ -160,15 +167,15 @@ const ProductGrid: React.FC = () => {
   }
 
   return (
-    <div className="px-4">
+    <div className="px-2 md:px-4">
       {/* Filter & Sort UI */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+      <div className="flex flex-col md:flex-row justify-between items-center mb-4 md:mb-6 gap-4">
         <div>
-          <label className="mr-2 font-medium">Sort:</label>
+          <label className="mr-2 font-medium text-sm md:text-base">Sort:</label>
           <select
             value={sortOption}
             onChange={(e) => setSortOption(e.target.value)}
-            className="border px-2 py-1 rounded"
+            className="border px-2 py-1 rounded text-sm md:text-base"
           >
             <option value="default">Default</option>
             <option value="priceLowHigh">Price: Low to High</option>
@@ -177,11 +184,11 @@ const ProductGrid: React.FC = () => {
         </div>
 
         <div>
-          <label className="mr-2 font-medium">Brand:</label>
+          <label className="mr-2 font-medium text-sm md:text-base">Brand:</label>
           <select
             value={brandFilter}
             onChange={(e) => setBrandFilter(e.target.value)}
-            className="border px-2 py-1 rounded"
+            className="border px-2 py-1 rounded text-sm md:text-base"
           >
             <option value="all">All Brands</option>
             {uniqueBrands.map((brand) => (
@@ -192,10 +199,16 @@ const ProductGrid: React.FC = () => {
       </div>
 
       {/* Product Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {filteredProducts.map((product) => (
-          <ProductCard key={product._id} product={product} />
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
+        {filteredProducts && filteredProducts.length > 0 ? (
+          filteredProducts.map((product) => (
+            <ProductCard key={product._id} product={product} />
+          ))
+        ) : (
+          <div className="col-span-full text-center py-12">
+            <p className="text-gray-500">No products found.</p>
+          </div>
+        )}
       </div>
     </div>
   );

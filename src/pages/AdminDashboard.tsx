@@ -9,6 +9,7 @@ interface Product {
   description: string;
   price: string;
   imageUrl: string;
+  cloudinaryId?: string;
   affiliateLink: string;
   brand?: string;
 }
@@ -64,18 +65,17 @@ const AdminDashboard: React.FC = () => {
 
       if (selectedImage) {
         productFormData.append('image', selectedImage);
-      } else if (formData.imageUrl) {
-        productFormData.append('imageUrl', formData.imageUrl);
       }
 
+      let response;
       if (editingProduct) {
-        await api.put(`/products/${editingProduct._id}`, productFormData, {
+        response = await api.put(`/products/${editingProduct._id}`, productFormData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
         });
       } else {
-        await api.post('/products', productFormData, {
+        response = await api.post('/products', productFormData, {
           headers: {
             'Content-Type': 'multipart/form-data'
           }
@@ -216,7 +216,7 @@ const AdminDashboard: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <img
-                          src={product.imageUrl}
+                          src={product.imageUrl ? product.imageUrl.replace('/upload/', '/upload/w_100,f_auto,q_auto/') : ''}
                           alt={product.name}
                           className="w-12 h-12 rounded-lg object-cover mr-4"
                         />
@@ -337,7 +337,7 @@ const AdminDashboard: React.FC = () => {
                     <div className="flex flex-col md:flex-row md:items-center md:space-x-4 space-y-2 md:space-y-0 flex-wrap">
                       {previewUrl && (
                         <img
-                          src={previewUrl}
+                          src={previewUrl ? previewUrl.replace('/upload/', '/upload/w_100,f_auto,q_auto/') : ''}
                           alt="Preview"
                           className="w-24 h-24 object-cover rounded-lg border border-gray-300"
                         />
