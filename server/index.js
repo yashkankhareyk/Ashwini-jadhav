@@ -19,7 +19,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({
   origin: [
     'http://localhost:3000', // local dev
-    'https://ashwini-jadhav-git-main-yashkankhareyks-projects.vercel.app/', // production, replace with your deployed frontend
+    'https://ashwini-jadhav-jrtgvkr58-yashkankhareyks-projects.vercel.app/', // production, replace with your deployed frontend
   ],
   credentials: true,
 }));
