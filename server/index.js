@@ -16,13 +16,19 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-app.use(cors({
-  origin: [
-    'http://localhost:3000', // local dev
-    'https://your-production-frontend-domain', // production, replace with your deployed frontend
-  ],
-  credentials: true,
-}));
+const allowedOrigins = [
+  'https://ashwini-jadhav-hjaq0sfka-yashkankhareyks-projects.vercel.app',
+  'https://lilycanal.com', // <-- also prepare for this
+];
+
+app.use(
+  cors({
+    origin: allowedOrigins,
+    credentials: true,
+  })
+);
+
+
 app.use(express.json());
 // app.use('/uploads', express.static('uploads'));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
